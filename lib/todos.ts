@@ -1,51 +1,60 @@
-import { Todo } from "@/types/api-todo";
+import { apiClient } from '@/services/api';
 
-export const todos: Todo[] = [
-  {
-    id: 1,
-    title: "Belajar React Server Components (RSC)",
-    description:
-      "Mempelajari konsep dasar Server Components pada Next.js dan perbedaannya dengan Client Components.",
-    completed: true,
-    createdAt: "2026-08-20",
-  },
-  {
-    id: 2,
-    title: "Memahami Next.js App Router",
-    description:
-      "Mempelajari struktur routing berbasis folder, dynamic route [id], layout, loading, dan error handling.",
-    completed: false,
-    createdAt: "2026-08-21",
-  },
-  {
-    id: 3,
-    title: "Membuat Aplikasi Todo List",
-    description:
-      "Praktik membuat CRUD Todo List sederhana menggunakan Next.js App Router.",
-    completed: false,
-    createdAt: "2026-08-22",
-  },
-  {
-    id: 4,
-    title: "Eksplorasi Client Components",
-    description:
-      "Menggunakan directive 'use client' untuk interaktivitas seperti form input, onClick handler, dan state.",
-    completed: false,
-    createdAt: "2026-08-22",
-  },
-];
-
-// Fungsi untuk mengambil semua data todos (halaman Home)
-export async function getTodos(): Promise<Todo[]> {
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return todos;
+export interface BackendTodo {
+  id: number;
+  todo: string;
+  completed: boolean;
 }
 
-// Fungsi untuk mengambil detail 1 todo berdasarkan ID (halaman Detail)
-export async function getTodoDetail(
-  id: string | number
-): Promise<Todo | null> {
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  const todo = todos.find((item) => item.id === Number(id));
-  return todo || null;
+export interface TodosResponse {
+  success: boolean;
+  message: string;
+  data: BackendTodo[];
 }
+
+export interface SingleTodoResponse {
+  success: boolean;
+  message: string;
+  data: BackendTodo;
+}
+
+export const todoService = {
+  // Mengambil daftar todo asli milik user dari backend Express
+  async getTodos(): Promise<BackendTodo[]> {
+    const res = await apiClient<TodosResponse>('/todos?perPage=50');
+    return res.data || [];
+  },
+
+  // Mengambil detail todo berdasarkan ID
+  async getTodoById(id: number | string): Promise<BackendTodo> {
+    const res = await apiClient<SingleTodoResponse>(`/todos/${id}`);
+    return res.data;
+  },
+
+  // Menambahkan todo baru ke database MySQL
+  async createTodo(payload: string): Promise<BackendTodo> {
+    const res = await apiClient<SingleTodoResponse>('/todos', {
+      method: 'POST',
+      body: JSON.stringify({ task: payload }),
+    });
+    return res.data;
+  },
+
+  // Memperbarui status / task di database MySQL
+  async updateTodo(
+    id: number | string,
+    payload: { task?: string; is_completed?: boolean }
+  ): Promise<void> {
+    await apiClient(`/todos/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Menghapus todo dari database MySQL
+  async deleteTodo(id: number | string): Promise<void> {
+    await apiClient(`/todos/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};

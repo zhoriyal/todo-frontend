@@ -1,34 +1,49 @@
-const API_BASE_URL = 'https://dummyjson.com';
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export class ApiError extends Error {
   status: number;
-  statusText: string;
-
-  constructor(message: string, status: number, statusText: string) {
+  constructor(message: string, status: number) {
     super(message);
+    this.name = 'ApiError';
     this.status = status;
-    this.statusText = statusText;
   }
 }
 
-export async function apiClient<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      ...options?.headers,
-    },
-    cache: 'no-store',
-    ...options,
-  });
+export async function apiClient<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
-  if (!response.ok) {
-    throw new ApiError(
-      `Gagal mengambil data dari API (Status: ${response.status} ${response.statusText})`,
-      response.status,
-      response.statusText
-    );
+  const defaultHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  if (token) {
+    defaultHeaders['Authorization'] = `Bearer ${token}`;
   }
 
-  return response.json();
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers: {
+        ...defaultHeaders,
+        ...options.headers,
+      },
+    });
+  } catch {
+    throw new Error('Gagal terhubung ke server backend');
+  }
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const errorMessage = data?.message || `Terjadi kesalahan (Status: ${response.status})`;
+    throw new ApiError(errorMessage, response.status);
+  }
+
+  return data as T;
 }
